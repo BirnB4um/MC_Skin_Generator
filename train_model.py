@@ -39,7 +39,8 @@ loss_values = []
 validation_loss_values = []
 
 def save_model():
-    torch.save(model, "model.pth")
+    torch.save(model.state_dict(), "model.pth")
+
     print("model saved")
 
     with open("data/loss.pkl", "wb") as file:
@@ -71,15 +72,15 @@ def list_to_image(list1, list2, file_name="image.png"):
 
 
 #hyperparameter
-new_loss_data = True
-load_model = False
+new_loss_data = False
+load_model = True
 save_model_after = True
 criterion = nn.MSELoss()
-learning_rate = 0.0001
+learning_rate = 0.0005
 batch_size = 32
 num_epoches = 1000
 num_train_skins = 9300
-num_test_skins = 100
+num_test_skins = 200
 
 
 #load old loss data
@@ -137,9 +138,10 @@ class CustomDataset(Dataset):
         sample = torch.tensor(sample, dtype=torch.float32)
         return sample
 
-dataset = CustomDataset(data[:(num_train_skins + num_test_skins)])
-train_dataloader = DataLoader(dataset[:num_train_skins], batch_size=batch_size, shuffle=True)
-test_data_loader = DataLoader(dataset[num_train_skins:], batch_size=1, shuffle=True)
+train_dataset = CustomDataset(data[:num_train_skins])
+test_dataset = CustomDataset(data[num_train_skins:])
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_data_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
 
 class Autoencoder(nn.Module):
     def __init__(self):
@@ -147,7 +149,6 @@ class Autoencoder(nn.Module):
         self.encode = nn.Sequential(
             nn.Linear(3552, 1024),
             nn.ReLU(),
-            nn.Dropout(0.5),
             nn.Linear(1024, 512),
             nn.Tanh(),
             nn.Dropout(0.4),
@@ -169,17 +170,18 @@ class Autoencoder(nn.Module):
         return self.decode(self.encode(x))
 
 #load/generate model
+print("create model...")
+model = Autoencoder()
 if load_model:
     print("loading model...")
-    model = torch.load("model.pth").to(device)
-else:
-    print("generating model...")
-    model = Autoencoder().to(device)
+    model.load_state_dict(torch.load("model.pth"))
+model = model.to(device)
 
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
 print(f"\n === Parameters ===\n"
+      f" new loss data: {new_loss_data}\n"
       f" load model: {load_model}\n"
       f" save model: {save_model_after}\n"
       f" learning rate: {learning_rate}\n"
@@ -188,7 +190,6 @@ print(f"\n === Parameters ===\n"
       f" number of training skins: {num_train_skins}\n"
       f" loss function: {type(criterion).__name__}\n"
       f" optimizer: {type(optimizer).__name__}\n"
-      f" new loss data: {new_loss_data}\n"
       " ===================\n")
 
 print("start training...\npress X to close application (hold A to save the model)")
@@ -198,6 +199,7 @@ plt.figure()
 
 #number for output images
 out_count = 1
+save_once = True
 
 # Train/Test loop
 for epoch in range(num_epoches):
@@ -214,6 +216,9 @@ for epoch in range(num_epoches):
             plt.ioff()
             plt.show()
             exit()
+
+        if keyboard.is_pressed("t"):
+            save_model()
 
         batch = batch.to(device)
 
@@ -251,7 +256,7 @@ for epoch in range(num_epoches):
                 break
 
         validation_loss_values.append(running_validation_loss/len(test_data_loader))
-
+            
 
     #plot loss values
     plt.clf()
@@ -262,7 +267,8 @@ for epoch in range(num_epoches):
     plt.grid(True)
     plt.plot(loss_values, c="r")
     plt.plot(validation_loss_values, c="b")
-    plt.legend(["loss", "validation_loss"])
+    plt.plot([abs(loss_values[i] - validation_loss_values[i]) for i in range(len(loss_values))], c="g")
+    plt.legend(["loss", "validation_loss", "difference"])
     plt.draw()
     plt.pause(0.1)
 
