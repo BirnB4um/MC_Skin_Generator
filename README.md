@@ -18,5 +18,8 @@ Run app.py or standalone dist/MSG.exe to start the application.
 | S | Save skin as an image |
 | L | Load a skin from an image |
 
+<img src="ReadMe/mov1.gif" width="400" height="200">
+<img src="ReadMe/mov2.gif" width="400" height="200">
+
 ---
 uses [MinePI](https://github.com/benno1237/MinePI) to render 3D Skin
