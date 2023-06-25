@@ -281,8 +281,13 @@ def generation_screen():
                 changed_model = True
             if event.key == pygame.K_s: #save model
                 file_path = asksaveasfilename()
-                if file_path != "":
-                    Image.fromarray(output_skin_data[:,:32,:].transpose(1,0,2)).save(file_path)
+                try:
+                    if file_path != "":
+                        if not file_path.endswith((".png",".jpg")):
+                            file_path = file_path + ".png"
+                        Image.fromarray(output_skin_data[:,:32,:].transpose(1,0,2)).save(file_path)
+                except:
+                    print("Error: couldn't save skin as image")
             if event.key == pygame.K_k: #knock sliders a bit
                 for i in range(latent_space_dim):
                     slider_values[i] = max(0, min(1, slider_values[i] + random.uniform(-0.08,0.08)))
@@ -291,18 +296,21 @@ def generation_screen():
             if event.key == pygame.K_l: #load model
                 file_path = askopenfilename()
                 if file_path != "":
-                    img = np.array(Image.open(file_path).convert("RGB"))
-                    if len(img[0]) != 64 or (len(img) != 64 and len(img) != 32):
-                        print("Error: Image size isn't supported (use 64x32 or 64x64)")
-                        break
-                    input = []
-                    for coord in pixel_lookup_table:
-                        input.append(img[coord[1]][coord[0]][0]/255)
-                        input.append(img[coord[1]][coord[0]][1]/255)
-                        input.append(img[coord[1]][coord[0]][2]/255)
+                    try:
+                        img = np.array(Image.open(file_path).convert("RGB"))
+                        if len(img[0]) != 64 or (len(img) != 64 and len(img) != 32):
+                            print("Error: Image size isn't supported (use 64x32 or 64x64)")
+                            break
+                        input = []
+                        for coord in pixel_lookup_table:
+                            input.append(img[coord[1]][coord[0]][0]/255)
+                            input.append(img[coord[1]][coord[0]][1]/255)
+                            input.append(img[coord[1]][coord[0]][2]/255)
 
-                    update_sliders_from_model(input)
-                    update_model_from_sliders()
+                        update_sliders_from_model(input)
+                        update_model_from_sliders()
+                    except:
+                        print("Error: couldn't load skin")
                 
             if event.key == pygame.K_m: #set slider to max
                 for i in range(latent_space_dim):
