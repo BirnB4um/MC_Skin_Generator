@@ -26,4 +26,6 @@ Example skins:
 <img src="ReadMe/skins.png" width="512" height="256">
 
 ---
-uses [MinePI](https://github.com/benno1237/MinePI) to render 3D Skin
+Uses [MinePI](https://github.com/benno1237/MinePI) to render 3D Skin.  
+
+Training Dataset from [here](https://www.kaggle.com/datasets/sha2048/minecraft-skin-dataset)
