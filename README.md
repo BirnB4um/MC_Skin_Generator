@@ -1,6 +1,7 @@
 # MC_Skin_Generator
 Generate new Minecraft Skins with an Autoencoder.  
 Run app.py or standalone dist/MSG.exe to start the application.  
+The model only produces classic skins without overlays.
 
 - The 128 sliders represent the latent space of the AE
 - The *intensity* slider changes the range of the main sliders from 0 to 10 (resulting range: -x to x)
