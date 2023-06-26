@@ -19,7 +19,8 @@ Run app.py or standalone dist/MSG.exe to start the application.
 | L | Load a skin from an image |
 
 Moving sliders example:  
-<img src="ReadMe/mov1.gif" width="500" height="250">
+<img src="ReadMe/mov1.gif" width="500" height="250">  
+More examples [here](https://youtu.be/9HcfFa7BI7k)
 
 Example skins:  
 <img src="ReadMe/skins.png" width="512" height="256">
