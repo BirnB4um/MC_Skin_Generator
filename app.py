@@ -244,7 +244,7 @@ text_max_slider = font.render(f"Randomize sliders maximal [M]", True, (255,255,2
 text_reset_slider = font.render(f"Reset sliders [0]", True, (255,255,255))
 text_knock_slider = font.render(f"Knock sliders [K]", True, (255,255,255))
 text_converge_model = font.render(f"Converge to equilibrium [H]", True, (255,255,255))
-text_move_slider = font.render(f"Move sliders [J]", True, (255,255,255))
+text_move_slider = font.render(f"Move sliders [J] (SHIFT to reverse)", True, (255,255,255))
 text_save_skin = font.render(f"Save skin [S]", True, (255,255,255))
 text_load_skin = font.render(f"Load skin [L]", True, (255,255,255))
 
@@ -334,7 +334,11 @@ def generation_screen():
 
     if key_is_pressed("j"):
         for i in range(latent_space_dim):
-            new_value = slider_values[i] + slider_vel[i]
+            if key_is_pressed("shift"):
+                new_value = slider_values[i] - slider_vel[i]
+            else:
+                new_value = slider_values[i] + slider_vel[i]
+
             if new_value < 0 or new_value > 1:
                 slider_vel[i] *= -1
             slider_values[i] = max(0, min(1, new_value))
