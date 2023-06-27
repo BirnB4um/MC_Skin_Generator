@@ -1,6 +1,7 @@
 # MC_Skin_Generator
 Generate new Minecraft Skins with an Autoencoder.  
 Run app.py or standalone dist/MSG.exe to start the application.  
+The model only produces classic skins without overlays.
 
 - The 128 sliders represent the latent space of the AE
 - The *intensity* slider changes the range of the main sliders from 0 to 10 (resulting range: -x to x)
@@ -19,10 +20,13 @@ Run app.py or standalone dist/MSG.exe to start the application.
 | L | Load a skin from an image |
 
 Moving sliders example:  
-<img src="ReadMe/mov1.gif" width="500" height="250">
+<img src="ReadMe/mov1.gif" width="500" height="250">  
+More examples [here](https://youtu.be/9HcfFa7BI7k)
 
 Example skins:  
 <img src="ReadMe/skins.png" width="512" height="256">
 
 ---
-uses [MinePI](https://github.com/benno1237/MinePI) to render 3D Skin
+Uses [MinePI](https://github.com/benno1237/MinePI) to render 3D Skin.  
+
+Training Dataset from [here](https://www.kaggle.com/datasets/sha2048/minecraft-skin-dataset)
