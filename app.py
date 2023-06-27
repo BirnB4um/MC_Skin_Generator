@@ -280,21 +280,19 @@ def generation_screen():
                 text_double_feed_trough = font.render(f"Double feed through [D]: {double_feed_through}", True, (255,255,255))
                 changed_model = True
             if event.key == pygame.K_s: #save model
-                file_path = asksaveasfilename()
-                try:
-                    if file_path != "":
-                        if not file_path.endswith((".png",".jpg")):
-                            file_path = file_path + ".png"
+                file_path = asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
+                if file_path != "":
+                    try:
                         Image.fromarray(output_skin_data[:,:32,:].transpose(1,0,2)).save(file_path)
-                except:
-                    print("Error: couldn't save skin as image")
+                    except:
+                        print("Error: couldn't save skin as image")
             if event.key == pygame.K_k: #knock sliders a bit
                 for i in range(latent_space_dim):
                     slider_values[i] = max(0, min(1, slider_values[i] + random.uniform(-0.08,0.08)))
                 slider_vel = [random.uniform(-0.03, 0.03) for i in range(latent_space_dim)]
                 changed_model = True
             if event.key == pygame.K_l: #load model
-                file_path = askopenfilename()
+                file_path = askopenfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
                 if file_path != "":
                     try:
                         img = np.array(Image.open(file_path).convert("RGB"))
