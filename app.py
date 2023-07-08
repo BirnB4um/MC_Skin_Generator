@@ -119,14 +119,14 @@ def update_sliders_from_model(input):
     
     output = model_encode.run(None,{model_encode.get_inputs()[0].name:input})[0]
     for i in range(latent_space_dim):
-        slider_values[slider_lookup_id[i]] = max(min((output[i] / (2*slider_range+0.000001)) + 0.5, 1), 0)
+        slider_values[slider_lookup_id[i]] = max(min(((output[i] if normalize_updated_sliders else output[i] * slider_range) / (2*slider_range+0.000001)) + 0.5, 1), 0)
 
 #feed slidervalues through model.decode, then update skin from output
 def update_model_from_sliders():
     output = model_decode.run(None,{model_decode.get_inputs()[0].name:([slider_values[slider_lookup_id[i]]*2*slider_range-slider_range for i in range(latent_space_dim)])})[0]
     if double_feed_through:
         output = model_encode.run(None, {model_encode.get_inputs()[0].name: output})[0]
-        output = model_decode.run(None, {model_decode.get_inputs()[0].name: output})[0]
+        output = model_decode.run(None, {model_decode.get_inputs()[0].name: output if normalize_updated_sliders else output * slider_range})[0]
     update_skin_from_output(output)
 
 def get_mouse_slider():
@@ -138,6 +138,10 @@ def get_mouse_slider():
             ind = 64 + int(63.0 * (mouse_x - (slider_offset_x-slider_spacing_x/2)) / (63*slider_spacing_x))
     
     return latent_space_dim-1 if ind>=latent_space_dim else ind
+
+def randomize_slider_velocities():
+    global slider_vel
+    slider_vel = [random.uniform(-slider_max_vel, slider_max_vel) for i in range(latent_space_dim)]
 
 def th_render_skin():
     global render_model, render_model_lock, render_data_lock, rendered_output_skin, rendered_output_skin_back
@@ -186,8 +190,7 @@ mouse_y = 0
 
 latent_space_dim = 128
 
-font = pygame.font.SysFont("Arial", 20)
-font_smaller = pygame.font.SysFont("Arial", 15)
+font = pygame.font.SysFont("Arial", 15)
 
 output_skin_data = np.zeros((64,64,4), dtype=np.uint8)
 output_skin_surface = pygame.surfarray.make_surface(output_skin_data[:,:32,:3])
@@ -212,7 +215,6 @@ upscaled_output_skin_surface = pygame.transform.scale(output_skin_surface, (upsc
 
 slider_lookup_id = [9, 22, 103, 108, 106, 52, 65, 119, 80, 51, 91, 47, 30, 28, 12, 69, 35, 20, 55, 127, 113, 105, 94, 36, 126, 14, 114, 81, 73, 104, 16, 98, 112, 6, 61, 88, 72, 24, 117, 67, 93, 82, 19, 83, 68, 74, 85, 79, 102, 86, 31, 111, 2, 37, 33, 122, 48, 44, 18, 96, 62, 70, 64, 13, 107, 0, 71, 40, 53, 46, 100, 43, 87, 7, 115, 123, 125, 78, 23, 60, 50, 59, 110, 49, 5, 45, 77, 90, 121, 11, 21, 38, 76, 32, 92, 120, 124, 3, 118, 56, 109, 84, 42, 89, 29, 101, 63, 4, 8, 17, 34, 75, 27, 66, 1, 58, 57, 39, 54, 26, 99, 95, 10, 116, 25, 15, 41, 97]
 
-slider_vel = [random.uniform(-0.03, 0.03) for i in range(latent_space_dim)]
 slider_values = np.full(latent_space_dim, 0.5, dtype=np.float32)
 slider_color = [(random.randint(50,255), random.randint(50,255), random.randint(50,255)) for i in range(latent_space_dim)]
 slider_width = 10
@@ -234,9 +236,22 @@ intensity_slider_value = 2/5
 pressed_intensity_slider = False
 intensity_slider_text_surface = font.render(f"Intensity: {round(slider_range,2)}", True, (255,255,255))
 
+max_vel_slider_x = 800
+max_vel_slider_y = 280
+max_vel_slider_width = 200
+max_vel_slider_height = 20
+max_vel_slider_max_value = 0.06
+max_vel_slider_value = 1/2
+pressed_max_vel_slider = False
+slider_max_vel = max_vel_slider_max_value * max_vel_slider_value
+slider_vel = [random.uniform(-slider_max_vel,slider_max_vel) for i in range(latent_space_dim)]
+max_vel_slider_text_surface = font.render(f"Max slider velocity: {round(slider_max_vel,5)}", True, (255,255,255))
+
+
 double_feed_through = False
 text_double_feed_trough = font.render(f"Double feed through [D]: {double_feed_through}", True, (255,255,255))
 
+normalize_updated_sliders = True
 
 text_randomsize = font.render(f"Randomize sliders [R]", True, (255,255,255))
 text_randomsize_normal = font.render(f"Randomize sliders normal dist. [Shift + R]", True, (255,255,255))
@@ -245,6 +260,7 @@ text_reset_slider = font.render(f"Reset sliders [0]", True, (255,255,255))
 text_knock_slider = font.render(f"Knock sliders [K]", True, (255,255,255))
 text_converge_model = font.render(f"Converge to equilibrium [H]", True, (255,255,255))
 text_move_slider = font.render(f"Move sliders [J] (SHIFT to reverse)", True, (255,255,255))
+text_normalize_updated_sliders = font.render(f"Normalize updated sliders [N]: {normalize_updated_sliders}", True, (255,255,255))
 text_save_skin = font.render(f"Save skin [S]", True, (255,255,255))
 text_load_skin = font.render(f"Load skin [L]", True, (255,255,255))
 
@@ -261,16 +277,18 @@ render_model_thread.start()
 def generation_screen():
     global pressed_slider_i, slider_values, double_feed_through, mouse_over_slider_i, pressed_intensity_slider
     global intensity_slider_value, slider_range, changed_model, intensity_slider_text_surface, text_double_feed_trough, slider_vel
+    global text_normalize_updated_sliders, normalize_updated_sliders, pressed_max_vel_slider, max_vel_slider_value, max_vel_slider_text_surface
+    global slider_max_vel
 
     for event in event_list:
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_r:
                 randomise_sliders()
-                slider_vel = [random.uniform(-0.03, 0.03) for i in range(latent_space_dim)]
+                randomize_slider_velocities()
                 changed_model = True
             if event.key == pygame.K_r and pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                slider_values = np.clip(np.random.normal(0.5,0.2,latent_space_dim), 0,1).astype(np.float32)
-                slider_vel = [random.uniform(-0.03, 0.03) for i in range(latent_space_dim)]
+                slider_values = np.clip(0.5+np.random.normal(size=latent_space_dim)*0.18, 0,1).astype(np.float32)
+                randomize_slider_velocities()
                 changed_model = True
             if event.key == pygame.K_0:
                 slider_values[:] = 0.5
@@ -278,6 +296,10 @@ def generation_screen():
             if event.key == pygame.K_d:
                 double_feed_through = not double_feed_through
                 text_double_feed_trough = font.render(f"Double feed through [D]: {double_feed_through}", True, (255,255,255))
+                changed_model = True
+            if event.key == pygame.K_n:
+                normalize_updated_sliders = not normalize_updated_sliders
+                text_normalize_updated_sliders = font.render(f"Normalize updated sliders [N]: {normalize_updated_sliders}", True, (255,255,255))
                 changed_model = True
             if event.key == pygame.K_s: #save model
                 file_path = asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
@@ -289,7 +311,7 @@ def generation_screen():
             if event.key == pygame.K_k: #knock sliders a bit
                 for i in range(latent_space_dim):
                     slider_values[i] = max(0, min(1, slider_values[i] + random.uniform(-0.08,0.08)))
-                slider_vel = [random.uniform(-0.03, 0.03) for i in range(latent_space_dim)]
+                randomize_slider_velocities()
                 changed_model = True
             if event.key == pygame.K_l: #load model
                 file_path = askopenfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
@@ -313,7 +335,7 @@ def generation_screen():
             if event.key == pygame.K_m: #set slider to max
                 for i in range(latent_space_dim):
                     slider_values[i] = 1 if random.uniform(0,1) < 0.5 else 0 if random.uniform(0,1) < 0.2 else 0.5
-                slider_vel = [random.uniform(-0.03, 0.03) for i in range(latent_space_dim)]
+                randomize_slider_velocities()
                 changed_model = True
 
         elif event.type == pygame.MOUSEBUTTONDOWN  and event.button == 1:
@@ -322,10 +344,15 @@ def generation_screen():
             #press slider_range_slider
             if point_vs_rect(mouse_x, mouse_y, intensity_slider_x, intensity_slider_y-intensity_slider_height/2, intensity_slider_width, intensity_slider_height):
                 pressed_intensity_slider = True
-        
+
+            #press max_vel slider
+            if point_vs_rect(mouse_x, mouse_y, max_vel_slider_x, max_vel_slider_y-max_vel_slider_height/2, max_vel_slider_width, max_vel_slider_height):
+                pressed_max_vel_slider = True
+
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             pressed_slider_i = -1 #release slider
             pressed_intensity_slider = False
+            pressed_max_vel_slider = False
             
         if event.type == pygame.MOUSEMOTION:
             #update mouse over slider
@@ -367,6 +394,15 @@ def generation_screen():
         intensity_slider_text_surface = font.render(f"Intensity: {round(slider_range,2)}", True, (255,255,255))
         changed_model = True
 
+    #update max_vel_slider
+    if pressed_max_vel_slider:
+        max_vel_slider_value = min(max((mouse_x-max_vel_slider_x)/max_vel_slider_width, 0), 1)
+        slider_max_vel = max_vel_slider_value * max_vel_slider_max_value
+        randomize_slider_velocities()
+        max_vel_slider_text_surface = font.render(f"Max slider velocity: {round(slider_max_vel,5)}", True, (255,255,255))
+        changed_model = True
+
+
     #update model
     if changed_model:
         changed_model = False
@@ -384,17 +420,24 @@ def generation_screen():
     pygame.draw.circle(window, (255,255,255), (intensity_slider_x + intensity_slider_value * intensity_slider_width, intensity_slider_y), intensity_slider_height/2)
     window.blit(intensity_slider_text_surface, (intensity_slider_x+intensity_slider_width+10, intensity_slider_y-intensity_slider_height/2))
 
+    #draw max_vel_slider
+    pygame.draw.line(window, (255,255,255), (max_vel_slider_x, max_vel_slider_y), (max_vel_slider_x+max_vel_slider_width, max_vel_slider_y))
+    pygame.draw.circle(window, (255,255,255), (max_vel_slider_x + max_vel_slider_value * max_vel_slider_width, max_vel_slider_y), max_vel_slider_height/2)
+    window.blit(max_vel_slider_text_surface, (max_vel_slider_x+max_vel_slider_width+10, max_vel_slider_y-max_vel_slider_height/2))
+
+
     #draw status text
-    window.blit(text_randomsize, (800,40))
-    window.blit(text_randomsize_normal,(800,65))
-    window.blit(text_max_slider,(800,90))
-    window.blit(text_knock_slider,(800,115))
-    window.blit(text_reset_slider,(800,140))
-    window.blit(text_move_slider,(800,165))
-    window.blit(text_converge_model,(800,190))
-    window.blit(text_double_feed_trough,(800,215))
-    window.blit(text_save_skin,(800,240))
-    window.blit(text_load_skin,(800,265))
+    window.blit(text_randomsize, (800,20))
+    window.blit(text_randomsize_normal,(800,40))
+    window.blit(text_max_slider,(800,60))
+    window.blit(text_knock_slider,(800,80))
+    window.blit(text_reset_slider,(800,100))
+    window.blit(text_move_slider,(800,120))
+    window.blit(text_converge_model,(800,140))
+    window.blit(text_double_feed_trough,(800,160))
+    window.blit(text_normalize_updated_sliders,(800,180))
+    window.blit(text_save_skin,(800,200))
+    window.blit(text_load_skin,(800,220))
 
     #draw slider
     y = slider_offset_y
