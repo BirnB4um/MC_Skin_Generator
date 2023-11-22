@@ -16,6 +16,7 @@ The model only produces classic skins without overlays.
 | J | Move sliders (randomizing/knocking sliders changes velocities) |
 | H | Converge sliders to equilibrium by feeding the output back into the input of the AE |
 | D | Double feed through: like 'H' but just once |
+| N | Normalize sliders (effects loading skin, double feed through and converging) |
 | S | Save skin as an image |
 | L | Load a skin from an image |
 
