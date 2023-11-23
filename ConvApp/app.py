@@ -60,6 +60,17 @@ class App:
         self.pca_std = np.load(get_file_path("pca_256_latentspace_std.npy"))
         self.pca_eigenvalues = np.load(get_file_path("pca_256_explained_variance.npy"))
 
+        self.skin_layout = np.zeros((64, 64))
+        self.skin_layout[:8,8:24] = 1
+        self.skin_layout[8:16,:32] = 1
+        self.skin_layout[20:32,:58] = 1
+        self.skin_layout[16:20,4:12] = 1
+        self.skin_layout[16:20,20:36] = 1
+        self.skin_layout[16:20,44:52] = 1
+        self.skin_layout[52:,16:48] = 1
+        self.skin_layout[48:,20:28] = 1
+        self.skin_layout[48:,36:44] = 1
+
         self.skin_front_layout = np.load(get_file_path("skin_front_layout.npy"))
         self.skin_front_overlay_layout = np.load(get_file_path("skin_front_overlay_layout.npy"))
         self.skin_back_layout = np.load(get_file_path("skin_back_layout.npy"))
@@ -129,6 +140,10 @@ class App:
     def run_model(self):
         model_output = self.model_decode.run(None, {"input": self.input_values})[0][0]
         model_output = model_output.transpose(1, 2, 0)
+
+        if not self.overlay:
+            model_output[:,:,3] = self.skin_layout
+
         alpha_mask = model_output[:,:,3:]
 
         if self.reduce_colors:
