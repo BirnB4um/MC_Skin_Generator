@@ -158,7 +158,29 @@ class App:
         self.skin_render_back_surface = pygame.transform.scale(self.skin_render_back_surface, (150, 300))
 
 
+    def load_skin(self):
+        file_path = askopenfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
+        if file_path != "":
+            try:
+                img = np.array(Image.open(file_path).convert("RGBA")).transpose(2,0,1).astype(np.float32)/255
 
+                # if classic skin
+                if img.shape[1] == 32 and img.shape[2] == 64:
+                    #convert classic skin to normal 64x64 skin
+                    new_img = np.zeros((4,64,64), dtype=np.float32)
+                    new_img[:,:32,:] = img
+
+
+                if not (img.shape[1] == 64 and img.shape[2] == 64):
+                    print("Error: wrong skin size. image must be 64x64 or 32x64 pixels") 
+                    return
+                
+                new_inputs = self.model_encode.run(None, {"input": img.reshape(1,4,64,64)})[0]
+                self.input_values = new_inputs
+                self.update_sliders_from_inputs()
+                self.run_model()
+            except:
+                print("Error: couldn't load skin")
 
     def save_skin(self):
         file_path = asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
@@ -208,6 +230,8 @@ class App:
                         self.run_model()
                     elif event.key == pygame.K_s:
                         self.save_skin()
+                    elif event.key == pygame.K_l:
+                        self.load_skin()
                     elif event.key == pygame.K_o:
                         self.overlay = not self.overlay
                         self.text_toggle_overlay = self.font.render("O - Toggle overlay", True, (255,255,255) if self.overlay else (100,100,100))
@@ -228,7 +252,7 @@ class App:
                         
                         if point_vs_rect(self.mouse_x, self.mouse_y, self.number_colors_slider_x, self.number_colors_slider_y, self.number_colors_slider_width, self.number_colors_slider_height):
                             self.mouse_pressed_colors_slider = True
-                            self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x) / (self.number_colors_slider_width-self.number_colors_slider_knob_width)) * (self.number_colors_max-self.number_colors_min) + self.number_colors_min, self.number_colors_min, self.number_colors_max))
+                            self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x) / (self.number_colors_slider_width-self.number_colors_slider_knob_width))**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min, self.number_colors_min, self.number_colors_max))
                             self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
                             self.run_model()
                             
@@ -250,7 +274,7 @@ class App:
                         self.run_model()
 
                     if self.mouse_pressed_colors_slider:
-                        self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x) / (self.number_colors_slider_width-self.number_colors_slider_knob_width)) * (self.number_colors_max-self.number_colors_min) + self.number_colors_min, self.number_colors_min, self.number_colors_max))
+                        self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x) / (self.number_colors_slider_width-self.number_colors_slider_knob_width))**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min, self.number_colors_min, self.number_colors_max))
                         self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
                         self.run_model()
 
@@ -297,7 +321,7 @@ class App:
                 pygame.draw.line(self.window, (255,255,255) if self.reduce_colors else (100,100,100),
                                     (self.number_colors_slider_x, self.number_colors_slider_y+self.number_colors_slider_height/2),
                                     (self.number_colors_slider_x+self.number_colors_slider_width, self.number_colors_slider_y+self.number_colors_slider_height/2))
-                pygame.draw.rect(self.window, (255,255,255) if self.reduce_colors else (100,100,100), pygame.Rect(self.number_colors_slider_x + ((self.number_of_colors-self.number_colors_min)/(self.number_colors_max-self.number_colors_min))*(self.number_colors_slider_width-self.number_colors_slider_knob_width), self.number_colors_slider_y, self.number_colors_slider_knob_width, self.number_colors_slider_height))
+                pygame.draw.rect(self.window, (255,255,255) if self.reduce_colors else (100,100,100), pygame.Rect(self.number_colors_slider_x + ((self.number_of_colors-self.number_colors_min)/(self.number_colors_max-self.number_colors_min))**0.5 *(self.number_colors_slider_width-self.number_colors_slider_knob_width), self.number_colors_slider_y, self.number_colors_slider_knob_width, self.number_colors_slider_height))
 
 
             pygame.display.flip()
