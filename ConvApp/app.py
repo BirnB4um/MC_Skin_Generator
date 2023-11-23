@@ -63,7 +63,7 @@ class App:
         self.skin_layout = np.zeros((64, 64))
         self.skin_layout[:8,8:24] = 1
         self.skin_layout[8:16,:32] = 1
-        self.skin_layout[20:32,:58] = 1
+        self.skin_layout[20:32,:56] = 1
         self.skin_layout[16:20,4:12] = 1
         self.skin_layout[16:20,20:36] = 1
         self.skin_layout[16:20,44:52] = 1
@@ -179,12 +179,14 @@ class App:
             try:
                 img = np.array(Image.open(file_path).convert("RGBA")).transpose(2,0,1).astype(np.float32)/255
 
-                # if classic skin
+                # if classic skin -> convert to 64x64 skin
                 if img.shape[1] == 32 and img.shape[2] == 64:
                     #convert classic skin to normal 64x64 skin
                     new_img = np.zeros((4,64,64), dtype=np.float32)
                     new_img[:,:32,:] = img
-
+                    new_img[:,48:,16:32] = new_img[:,16:32,:16]
+                    new_img[:,48:,32:48] = new_img[:,16:32,40:56]
+                    img = new_img
 
                 if not (img.shape[1] == 64 and img.shape[2] == 64):
                     print("Error: wrong skin size. image must be 64x64 or 32x64 pixels") 
