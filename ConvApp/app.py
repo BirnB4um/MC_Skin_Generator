@@ -73,6 +73,8 @@ class App:
         self.skin_front_overlay_layout = np.load(get_file_path("skin_front_overlay_layout.npy"))
         self.skin_back_layout = np.load(get_file_path("skin_back_layout.npy"))
         self.skin_back_overlay_layout = np.load(get_file_path("skin_back_overlay_layout.npy"))
+        with open(get_file_path("pca_descriptions.txt"), "r") as file:
+            self.slider_descriptions = file.read().splitlines()
 
         self.input_values = np.zeros((1,512), dtype=np.float32)
         self.slider_values = np.full((256), 0.5, dtype=np.float32)
@@ -89,7 +91,7 @@ class App:
         self.mouse_over_slider_i = None
         self.mouse_pressed_slider_i = None
         self.slider_scroll_speed = 3
-        self.slider_numbers = [self.font_small.render(str(i), True, (255,255,255)) for i in range(256)]
+        self.slider_numbers = [self.font_small.render(str(i+1), True, (255,255,255)) for i in range(256)]
 
         self.skin_surface = None
         self.skin_array = np.zeros((64, 64, 4), dtype=np.uint8)
@@ -144,6 +146,7 @@ class App:
         self.text_reduce_colors = self.font.render("C - Reduce colors", True, (255,255,255) if self.reduce_colors else (100,100,100))
         self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
         self.text_slider_range = self.font.render("Slider range: " + str(self.slider_range_factor), True, (255,255,255))
+        self.text_slider_description = self.font.render("", True, (255,255,255))
 
         self.update_inputs_from_sliders()
         self.run_model()
@@ -351,7 +354,11 @@ class App:
 
                 elif event.type == pygame.MOUSEMOTION:
                     if point_vs_rect(self.mouse_x, self.mouse_y, self.slider_x-self.slider_spacing/2, self.slider_y, (self.slider_width+self.slider_spacing)*self.number_of_sliders_shown, self.slider_height):
+                        before_i = self.mouse_over_slider_i
                         self.mouse_over_slider_i = self.slider_offset + int((self.mouse_x - self.slider_x + self.slider_spacing/2) / (self.slider_width + self.slider_spacing))
+                        if self.mouse_over_slider_i != before_i:
+                            i = self.mouse_over_slider_i if self.mouse_pressed_slider_i == None else self.mouse_pressed_slider_i
+                            self.text_slider_description = self.font.render(f"{i+1}: "+self.slider_descriptions[i], True, (255,255,255))
                     else:
                         self.mouse_over_slider_i = None
 
@@ -421,6 +428,9 @@ class App:
                 self.window.blit(self.text_reduce_colors, (self.width-200, self.number_colors_slider_y-22))
                 self.window.blit(self.text_number_of_colors, (self.width-200, self.number_colors_slider_y+20))
                 self.window.blit(self.text_slider_range, (self.width-200, self.slider_range_y-22))
+
+                if self.mouse_over_slider_i != None or self.mouse_pressed_slider_i != None:
+                    self.window.blit(self.text_slider_description, (10, 360))
 
                 # draw number of colors slider
                 pygame.draw.line(self.window, (255,255,255) if self.reduce_colors else (100,100,100),
