@@ -79,8 +79,6 @@ class App:
 
         self.input_values = np.zeros((1,512), dtype=np.float32)
         self.slider_values = np.full((256), 0.5, dtype=np.float32)
-        self.slider_intensity = 1
-        self.slider_range_factor = 3
         self.slider_offset = 0
         self.number_of_sliders = 256
         self.slider_spacing = 5
@@ -112,7 +110,8 @@ class App:
         self.sharpen_slider_knob_width = 8
         self.sharpen_max = 25
         self.sharpen_min = 4.0001
-        self.sharpen_value = self.sharpen_max
+        self.sharpen_value_default = 12
+        self.sharpen_value = self.sharpen_value_default
 
         self.reduce_colors = False
         self.mouse_pressed_colors_slider = False
@@ -123,7 +122,19 @@ class App:
         self.number_colors_slider_knob_width = 8
         self.number_colors_max = 64
         self.number_colors_min = 1
-        self.number_of_colors = 16
+        self.number_of_colors_default = 16
+        self.number_of_colors = self.number_of_colors_default
+
+        self.mouse_pressed_range_slider = False
+        self.slider_range_x = self.width-200
+        self.slider_range_y = 300
+        self.slider_range_width = 170
+        self.slider_range_height = 18
+        self.slider_range_knob_width = 8
+        self.slider_range_max = 10
+        self.slider_range_min = 0.1
+        self.slider_range_default = 3
+        self.slider_range_factor = self.slider_range_default
 
 
         self.text_randomize_slider = self.font.render("R - Randomize sliders", True, (255,255,255))
@@ -135,7 +146,7 @@ class App:
         self.text_sharpen_value = self.font.render("Sharpen value: " + str(self.sharpen_value), True, (255,255,255) if self.sharpen_skin else (100,100,100))
         self.text_reduce_colors = self.font.render("C - Reduce colors", True, (255,255,255) if self.reduce_colors else (100,100,100))
         self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
-
+        self.text_slider_range = self.font.render("Slider range: " + str(self.slider_range_factor), True, (255,255,255))
 
         self.update_inputs_from_sliders()
         self.run_model()
@@ -244,12 +255,12 @@ class App:
         self.input_values[0] = np.dot(pca_input, self.pca_components) + self.pca_mean
 
     def update_sliders_from_inputs(self):
-        pca_reduced = np.dot(self.input_values[0] - self.pca_mean, self.pca_components.T)
-        self.slider_values = (1-(pca_reduced / (self.pca_std * self.slider_range_factor)))/2
+        raw_slider_values = np.dot(self.input_values[0] - self.pca_mean, self.pca_components.T)
+        self.slider_values = (1-(raw_slider_values/(self.pca_std * self.slider_range_factor)))/2
         self.slider_values = np.clip(self.slider_values, 0, 1)
-        
+
     def randomize_slider_values(self):
-        self.slider_values = (1-(self.slider_intensity*np.random.normal(0, self.pca_std, 256)/(self.pca_std * self.slider_range_factor)))/2
+        self.slider_values = (1-(np.random.normal(0, self.pca_std, 256)/(self.pca_std * self.slider_range_factor)))/2
         self.slider_values = np.clip(self.slider_values, 0, 1)
         self.update_inputs_from_sliders()
 
@@ -318,6 +329,14 @@ class App:
                             self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x - self.number_colors_slider_knob_width/2) / (self.number_colors_slider_width-self.number_colors_slider_knob_width)),0,1)**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min)
                             self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
                             self.run_model()
+
+                        # mouse over slider range slider
+                        if point_vs_rect(self.mouse_x, self.mouse_y, self.slider_range_x, self.slider_range_y, self.slider_range_width, self.slider_range_height):
+                            self.mouse_pressed_range_slider = True
+                            self.slider_range_factor = np.clip(((self.mouse_x - self.slider_range_x - self.slider_range_knob_width/2) / (self.slider_range_width-self.slider_range_knob_width)),0,1) * (self.slider_range_max-self.slider_range_min) + self.slider_range_min
+                            self.text_slider_range = self.font.render("Slider range: " + str(round(self.slider_range_factor,2)), True, (255,255,255))
+                            self.update_inputs_from_sliders()
+                            self.run_model()
                             
 
                 elif event.type == pygame.MOUSEBUTTONUP:
@@ -325,6 +344,7 @@ class App:
                         self.mouse_pressed_slider_i = None
                         self.mouse_pressed_colors_slider = False
                         self.mouse_pressed_sharpen_slider = False
+                        self.mouse_pressed_range_slider = False
 
                 elif event.type == pygame.MOUSEMOTION:
                     if point_vs_rect(self.mouse_x, self.mouse_y, self.slider_x-self.slider_spacing/2, self.slider_y, (self.slider_width+self.slider_spacing)*self.number_of_sliders_shown, self.slider_height):
@@ -339,12 +359,22 @@ class App:
 
                     if self.mouse_pressed_sharpen_slider:
                         self.sharpen_value = np.clip(((self.mouse_x - self.sharpen_slider_x - self.sharpen_slider_knob_width/2) / (self.sharpen_slider_width-self.sharpen_slider_knob_width)),0,1)**2 * (self.sharpen_max-self.sharpen_min) + self.sharpen_min
+                        if abs(self.sharpen_value - self.sharpen_value_default) < 0.5:
+                            self.sharpen_value = self.sharpen_value_default
                         self.text_sharpen_value = self.font.render("Sharpen value: " + str(round(self.sharpen_value,1)), True, (255,255,255) if self.sharpen_skin else (100,100,100))
                         self.run_model()
 
                     if self.mouse_pressed_colors_slider:
                         self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x - self.number_colors_slider_knob_width/2) / (self.number_colors_slider_width-self.number_colors_slider_knob_width)),0,1)**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min)
                         self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
+                        self.run_model()
+
+                    if self.mouse_pressed_range_slider:
+                        self.slider_range_factor = np.clip(((self.mouse_x - self.slider_range_x - self.slider_range_knob_width/2) / (self.slider_range_width-self.slider_range_knob_width)),0,1) * (self.slider_range_max-self.slider_range_min) + self.slider_range_min
+                        if abs(self.slider_range_factor - self.slider_range_default) < 0.3:
+                            self.slider_range_factor = self.slider_range_default
+                        self.text_slider_range = self.font.render("Slider range: " + str(round(self.slider_range_factor,2)), True, (255,255,255))
+                        self.update_inputs_from_sliders()
                         self.run_model()
 
                 elif event.type == pygame.MOUSEWHEEL:
@@ -387,8 +417,12 @@ class App:
                 self.window.blit(self.text_sharpen_value, (self.width-200, self.sharpen_slider_y+20))
                 self.window.blit(self.text_reduce_colors, (self.width-200, self.number_colors_slider_y-22))
                 self.window.blit(self.text_number_of_colors, (self.width-200, self.number_colors_slider_y+20))
+                self.window.blit(self.text_slider_range, (self.width-200, self.slider_range_y-22))
 
                 # draw number of colors slider
+                pygame.draw.line(self.window, (255,255,255) if self.reduce_colors else (100,100,100),
+                                    (self.number_colors_slider_x + ((self.number_of_colors_default-self.number_colors_min)/(self.number_colors_max-self.number_colors_min))**0.5 * self.number_colors_slider_width, self.number_colors_slider_y),
+                                    (self.number_colors_slider_x + ((self.number_of_colors_default-self.number_colors_min)/(self.number_colors_max-self.number_colors_min))**0.5 * self.number_colors_slider_width, self.number_colors_slider_y + self.number_colors_slider_height))
                 pygame.draw.line(self.window, (255,255,255) if self.reduce_colors else (100,100,100),
                                     (self.number_colors_slider_x, self.number_colors_slider_y+self.number_colors_slider_height/2),
                                     (self.number_colors_slider_x+self.number_colors_slider_width, self.number_colors_slider_y+self.number_colors_slider_height/2))
@@ -396,10 +430,21 @@ class App:
 
                 # draw sharpen slider
                 pygame.draw.line(self.window, (255,255,255) if self.sharpen_skin else (100,100,100),
+                                    (self.sharpen_slider_x + ((self.sharpen_value_default-self.sharpen_min)/(self.sharpen_max-self.sharpen_min))**0.5 * self.sharpen_slider_width, self.sharpen_slider_y),
+                                    (self.sharpen_slider_x + ((self.sharpen_value_default-self.sharpen_min)/(self.sharpen_max-self.sharpen_min))**0.5 * self.sharpen_slider_width, self.sharpen_slider_y + self.sharpen_slider_height))
+                pygame.draw.line(self.window, (255,255,255) if self.sharpen_skin else (100,100,100),
                                     (self.sharpen_slider_x, self.sharpen_slider_y+self.sharpen_slider_height/2),
                                     (self.sharpen_slider_x+self.sharpen_slider_width, self.sharpen_slider_y+self.sharpen_slider_height/2))
                 pygame.draw.rect(self.window, (255,255,255) if self.sharpen_skin else (100,100,100), pygame.Rect(int(self.sharpen_slider_x + ((self.sharpen_value-self.sharpen_min)/(self.sharpen_max-self.sharpen_min))**0.5 * (self.sharpen_slider_width-self.sharpen_slider_knob_width)), self.sharpen_slider_y, self.sharpen_slider_knob_width, self.sharpen_slider_height))
 
+                # draw slider range slider
+                pygame.draw.line(self.window, (255,255,255),
+                                    (self.slider_range_x + ((self.slider_range_default-self.slider_range_min)/(self.slider_range_max-self.slider_range_min)) * self.slider_range_width, self.slider_range_y),
+                                    (self.slider_range_x + ((self.slider_range_default-self.slider_range_min)/(self.slider_range_max-self.slider_range_min)) * self.slider_range_width, self.slider_range_y + self.slider_range_height))
+                pygame.draw.line(self.window, (255,255,255),
+                                    (self.slider_range_x, self.slider_range_y+self.slider_range_height/2),
+                                    (self.slider_range_x+self.slider_range_width, self.slider_range_y+self.slider_range_height/2))
+                pygame.draw.rect(self.window, (255,255,255), pygame.Rect(int(self.slider_range_x + ((self.slider_range_factor-self.slider_range_min)/(self.slider_range_max-self.slider_range_min)) * (self.slider_range_width-self.slider_range_knob_width)), self.slider_range_y, self.slider_range_knob_width, self.slider_range_height))
 
             pygame.display.flip()
             self.clock.tick(40)
