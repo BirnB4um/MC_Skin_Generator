@@ -12,6 +12,7 @@ import pygame
 from keyboard import is_pressed as key_is_pressed
 from time import sleep
 from sklearn.cluster import KMeans
+from scipy.signal import convolve2d
 
 
 def get_file_path(file_name):
@@ -95,31 +96,43 @@ class App:
         self.slider_scroll_speed = 3
         self.slider_numbers = [self.font_small.render(str(i), True, (255,255,255)) for i in range(256)]
 
-
         self.skin_surface = None
         self.skin_array = np.zeros((64, 64, 4), dtype=np.uint8)
-
         self.skin_render_front_surface = None
         self.skin_render_back_surface = None
 
         self.overlay = True
 
+        self.sharpen_skin = False
+        self.mouse_pressed_sharpen_slider = False
+        self.sharpen_slider_x = self.width-200
+        self.sharpen_slider_y = 153
+        self.sharpen_slider_width = 170
+        self.sharpen_slider_height = 18
+        self.sharpen_slider_knob_width = 8
+        self.sharpen_max = 25
+        self.sharpen_min = 4.0001
+        self.sharpen_value = self.sharpen_max
+
+        self.reduce_colors = False
+        self.mouse_pressed_colors_slider = False
         self.number_colors_slider_x = self.width-200
-        self.number_colors_slider_y = 165
+        self.number_colors_slider_y = 224
         self.number_colors_slider_width = 170
         self.number_colors_slider_height = 18
         self.number_colors_slider_knob_width = 8
         self.number_colors_max = 64
         self.number_colors_min = 1
         self.number_of_colors = 16
-        self.reduce_colors = False
-        self.mouse_pressed_colors_slider = False
+
 
         self.text_randomize_slider = self.font.render("R - Randomize sliders", True, (255,255,255))
         self.text_reset_slider = self.font.render("0 - Reset sliders", True, (255,255,255))
         self.text_save_skin = self.font.render("S - Save skin", True, (255,255,255))
         self.text_load_skin = self.font.render("L - Load skin", True, (255,255,255))
         self.text_toggle_overlay = self.font.render("O - Toggle overlay", True, (255,255,255) if self.overlay else (100,100,100))
+        self.text_sharpen = self.font.render("X - Sharpen", True, (255,255,255) if self.sharpen_skin else (100,100,100))
+        self.text_sharpen_value = self.font.render("Sharpen value: " + str(self.sharpen_value), True, (255,255,255) if self.sharpen_skin else (100,100,100))
         self.text_reduce_colors = self.font.render("C - Reduce colors", True, (255,255,255) if self.reduce_colors else (100,100,100))
         self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
 
@@ -137,15 +150,36 @@ class App:
         reduced_image = cluster_centers[labels].reshape(image.shape[0], image.shape[1], image.shape[2])
         return reduced_image, cluster_centers
 
+    def apply_sharpening_filter(self, image, strength=10, sharpen_alpha=False):
+        kernel = np.array([
+            [0, -1, 0],
+            [-1, strength, -1],
+            [0, -1, 0]
+        ], dtype=np.float32)
+        kernel = kernel / np.sum(kernel)
+
+        sharpened_image = image.copy()
+
+        for i in range(4 if sharpen_alpha else 3):  # Loop through color channels
+            sharpened_image[:, :, i] = convolve2d(image[:, :, i], kernel, mode='same')
+
+        return np.clip(sharpened_image, 0, 1)
+
     def run_model(self):
         model_output = self.model_decode.run(None, {"input": self.input_values})[0][0]
         model_output = model_output.transpose(1, 2, 0)
 
+        # remove overlay
         if not self.overlay:
             model_output[:,:,3] = self.skin_layout
 
         alpha_mask = model_output[:,:,3:]
 
+        # sharpen skin
+        if self.sharpen_skin:
+            model_output = self.apply_sharpening_filter(model_output, self.sharpen_value, True)
+
+        # reduce colors
         if self.reduce_colors:
             reduced_model_output, cluster_centers = self.reduce_color_palette(model_output[:,:,:3], self.number_of_colors, 1)
             model_output = np.concatenate((reduced_model_output, model_output[:,:,3:]), axis=2)
@@ -154,7 +188,6 @@ class App:
         skin_data = (self.skin_array[:,:,:3] * alpha_mask).transpose(1, 0, 2)
         self.skin_surface = pygame.surfarray.make_surface(skin_data)
         self.skin_surface = pygame.transform.scale(self.skin_surface, (300, 300))
-
 
         self.skin_array[0,0,:3] = self.background_color # set background color
         self.skin_array[0,0,3] = 0
@@ -171,7 +204,6 @@ class App:
         rendered_skin[:,:,:3] = rendered_skin[:,:,:3] * (1-overlay_alpha) + overlay_alpha * self.skin_array[self.skin_back_overlay_layout[:,:,0],self.skin_back_overlay_layout[:,:,1],:3]
         self.skin_render_back_surface = pygame.surfarray.make_surface(rendered_skin.transpose(1, 0, 2)[:,:,:3])
         self.skin_render_back_surface = pygame.transform.scale(self.skin_render_back_surface, (150, 300))
-
 
     def load_skin(self):
         file_path = askopenfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All files", "*")])
@@ -216,7 +248,6 @@ class App:
         self.slider_values = (1-(pca_reduced / (self.pca_std * self.slider_range_factor)))/2
         self.slider_values = np.clip(self.slider_values, 0, 1)
         
-
     def randomize_slider_values(self):
         self.slider_values = (1-(self.slider_intensity*np.random.normal(0, self.pca_std, 256)/(self.pca_std * self.slider_range_factor)))/2
         self.slider_values = np.clip(self.slider_values, 0, 1)
@@ -253,6 +284,11 @@ class App:
                         self.overlay = not self.overlay
                         self.text_toggle_overlay = self.font.render("O - Toggle overlay", True, (255,255,255) if self.overlay else (100,100,100))
                         self.run_model()
+                    elif event.key == pygame.K_x:
+                        self.sharpen_skin = not self.sharpen_skin
+                        self.text_sharpen = self.font.render("X - Sharpen", True, (255,255,255) if self.sharpen_skin else (100,100,100))
+                        self.text_sharpen_value = self.font.render("Sharpen value: " + str(round(self.sharpen_value,1)), True, (255,255,255) if self.sharpen_skin else (100,100,100))
+                        self.run_model()
                     elif event.key == pygame.K_c:
                         self.reduce_colors = not self.reduce_colors
                         self.text_reduce_colors = self.font.render("C - Reduce colors", True, (255,255,255) if self.reduce_colors else (100,100,100))
@@ -262,14 +298,24 @@ class App:
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1: # left mouse button
                         self.mouse_pressed_slider_i = self.mouse_over_slider_i
+
+                        # mouse over pca sliders
                         if self.mouse_pressed_slider_i != None:
                             self.slider_values[self.mouse_pressed_slider_i] = np.clip((self.mouse_y - self.slider_y - self.slider_knob_height/2) / (self.slider_height-self.slider_knob_height), 0, 1)
                             self.update_inputs_from_sliders()
                             self.run_model()
+
+                        # mouse over sharpen slider
+                        if point_vs_rect(self.mouse_x, self.mouse_y, self.sharpen_slider_x, self.sharpen_slider_y, self.sharpen_slider_width, self.sharpen_slider_height):
+                            self.mouse_pressed_sharpen_slider = True
+                            self.sharpen_value = np.clip(((self.mouse_x - self.sharpen_slider_x - self.sharpen_slider_knob_width/2) / (self.sharpen_slider_width-self.sharpen_slider_knob_width)),0,1)**2 * (self.sharpen_max-self.sharpen_min) + self.sharpen_min
+                            self.text_sharpen_value = self.font.render("Sharpen value: " + str(round(self.sharpen_value,1)), True, (255,255,255) if self.sharpen_skin else (100,100,100))
+                            self.run_model()
                         
+                        # mouse over number of colors slider
                         if point_vs_rect(self.mouse_x, self.mouse_y, self.number_colors_slider_x, self.number_colors_slider_y, self.number_colors_slider_width, self.number_colors_slider_height):
                             self.mouse_pressed_colors_slider = True
-                            self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x) / (self.number_colors_slider_width-self.number_colors_slider_knob_width))**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min, self.number_colors_min, self.number_colors_max))
+                            self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x - self.number_colors_slider_knob_width/2) / (self.number_colors_slider_width-self.number_colors_slider_knob_width)),0,1)**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min)
                             self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
                             self.run_model()
                             
@@ -278,6 +324,7 @@ class App:
                     if event.button == 1: # left mouse button
                         self.mouse_pressed_slider_i = None
                         self.mouse_pressed_colors_slider = False
+                        self.mouse_pressed_sharpen_slider = False
 
                 elif event.type == pygame.MOUSEMOTION:
                     if point_vs_rect(self.mouse_x, self.mouse_y, self.slider_x-self.slider_spacing/2, self.slider_y, (self.slider_width+self.slider_spacing)*self.number_of_sliders_shown, self.slider_height):
@@ -290,8 +337,13 @@ class App:
                         self.update_inputs_from_sliders()
                         self.run_model()
 
+                    if self.mouse_pressed_sharpen_slider:
+                        self.sharpen_value = np.clip(((self.mouse_x - self.sharpen_slider_x - self.sharpen_slider_knob_width/2) / (self.sharpen_slider_width-self.sharpen_slider_knob_width)),0,1)**2 * (self.sharpen_max-self.sharpen_min) + self.sharpen_min
+                        self.text_sharpen_value = self.font.render("Sharpen value: " + str(round(self.sharpen_value,1)), True, (255,255,255) if self.sharpen_skin else (100,100,100))
+                        self.run_model()
+
                     if self.mouse_pressed_colors_slider:
-                        self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x) / (self.number_colors_slider_width-self.number_colors_slider_knob_width))**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min, self.number_colors_min, self.number_colors_max))
+                        self.number_of_colors = int(np.clip(((self.mouse_x - self.number_colors_slider_x - self.number_colors_slider_knob_width/2) / (self.number_colors_slider_width-self.number_colors_slider_knob_width)),0,1)**2 * (self.number_colors_max-self.number_colors_min) + self.number_colors_min)
                         self.text_number_of_colors = self.font.render("Number of colors: " + str(self.number_of_colors), True, (255,255,255) if self.reduce_colors else (100,100,100))
                         self.run_model()
 
@@ -310,7 +362,7 @@ class App:
                 self.window.blit(self.skin_render_front_surface, (320, 10))
                 self.window.blit(self.skin_render_back_surface, (480, 10))
 
-                # draw sliders
+                # draw pca sliders
                 for slider_i in range(self.slider_offset, self.slider_offset+self.number_of_sliders_shown):
                     slider_x = self.slider_x + (self.slider_width + self.slider_spacing) * (slider_i-self.slider_offset)
                     slider_color = self.slider_colors[slider_i]
@@ -331,14 +383,22 @@ class App:
                 self.window.blit(self.text_save_skin, (self.width-200, 60))
                 self.window.blit(self.text_load_skin, (self.width-200, 80))
                 self.window.blit(self.text_toggle_overlay, (self.width-200, 100))
-                self.window.blit(self.text_reduce_colors, (self.width-200, 120))
-                self.window.blit(self.text_number_of_colors, (self.width-200, 140))
+                self.window.blit(self.text_sharpen, (self.width-200, self.sharpen_slider_y-22))
+                self.window.blit(self.text_sharpen_value, (self.width-200, self.sharpen_slider_y+20))
+                self.window.blit(self.text_reduce_colors, (self.width-200, self.number_colors_slider_y-22))
+                self.window.blit(self.text_number_of_colors, (self.width-200, self.number_colors_slider_y+20))
 
                 # draw number of colors slider
                 pygame.draw.line(self.window, (255,255,255) if self.reduce_colors else (100,100,100),
                                     (self.number_colors_slider_x, self.number_colors_slider_y+self.number_colors_slider_height/2),
                                     (self.number_colors_slider_x+self.number_colors_slider_width, self.number_colors_slider_y+self.number_colors_slider_height/2))
                 pygame.draw.rect(self.window, (255,255,255) if self.reduce_colors else (100,100,100), pygame.Rect(self.number_colors_slider_x + ((self.number_of_colors-self.number_colors_min)/(self.number_colors_max-self.number_colors_min))**0.5 *(self.number_colors_slider_width-self.number_colors_slider_knob_width), self.number_colors_slider_y, self.number_colors_slider_knob_width, self.number_colors_slider_height))
+
+                # draw sharpen slider
+                pygame.draw.line(self.window, (255,255,255) if self.sharpen_skin else (100,100,100),
+                                    (self.sharpen_slider_x, self.sharpen_slider_y+self.sharpen_slider_height/2),
+                                    (self.sharpen_slider_x+self.sharpen_slider_width, self.sharpen_slider_y+self.sharpen_slider_height/2))
+                pygame.draw.rect(self.window, (255,255,255) if self.sharpen_skin else (100,100,100), pygame.Rect(int(self.sharpen_slider_x + ((self.sharpen_value-self.sharpen_min)/(self.sharpen_max-self.sharpen_min))**0.5 * (self.sharpen_slider_width-self.sharpen_slider_knob_width)), self.sharpen_slider_y, self.sharpen_slider_knob_width, self.sharpen_slider_height))
 
 
             pygame.display.flip()
