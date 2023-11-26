@@ -5,13 +5,10 @@ import random
 from time import sleep
 import asyncio
 from tkinter.filedialog import askopenfilename, asksaveasfilename
-import threading
 import numpy as np
 import sys
 import pygame
 from keyboard import is_pressed as key_is_pressed
-from time import sleep
-from sklearn.cluster import KMeans
 from scipy.signal import convolve2d
 
 
@@ -152,14 +149,11 @@ class App:
         self.run_model()
 
 
-    def reduce_color_palette(self, image, num_colors, n_init=5):
-        reshaped_image = image.reshape(-1, image.shape[2])
-        kmeans = KMeans(n_clusters=num_colors, n_init=n_init)
-        kmeans.fit(reshaped_image)
-        cluster_centers = kmeans.cluster_centers_
-        labels = kmeans.predict(reshaped_image)
-        reduced_image = cluster_centers[labels].reshape(image.shape[0], image.shape[1], image.shape[2])
-        return reduced_image, cluster_centers
+    def reduce_color_palette(self, image, num_colors):
+        image = Image.fromarray(np.uint8(image))
+        quantized_image = image.quantize(colors=num_colors, method=Image.Quantize.MEDIANCUT, kmeans=0, palette=None, dither=Image.FLOYDSTEINBERG)
+        quantized_image = quantized_image.convert('RGB')
+        return np.array(quantized_image)
 
     def apply_sharpening_filter(self, image, strength=10, sharpen_alpha=False):
         kernel = np.array([
@@ -192,10 +186,12 @@ class App:
 
         # reduce colors
         if self.reduce_colors:
-            reduced_model_output, cluster_centers = self.reduce_color_palette(model_output[:,:,:3], self.number_of_colors, 1)
-            model_output = np.concatenate((reduced_model_output, model_output[:,:,3:]), axis=2)
+            reduced_model_output = self.reduce_color_palette(model_output[:,:,:3]*255, self.number_of_colors)
+            model_output = np.concatenate((reduced_model_output, model_output[:,:,3:]*255), axis=2).astype(np.uint8)
+            self.skin_array = model_output
+        else:
+            self.skin_array = (model_output*255).astype(np.uint8)
 
-        self.skin_array = (model_output*255).astype(np.uint8)
         skin_data = (self.skin_array[:,:,:3] * alpha_mask).transpose(1, 0, 2)
         self.skin_surface = pygame.surfarray.make_surface(skin_data)
         self.skin_surface = pygame.transform.scale(self.skin_surface, (300, 300))
@@ -269,7 +265,14 @@ class App:
         self.update_inputs_from_sliders()
 
     def update(self):
-        pass
+
+        # feed output-skin back through model
+        if key_is_pressed("h"):
+            self.input_values = self.model_encode.run(None, {"input": [(self.skin_array.transpose(2,0,1)/255).astype(np.float32)]})[0]
+            self.update_sliders_from_inputs()
+            self.update_inputs_from_sliders()
+            self.run_model()
+            
 
     def run(self):
         while self.running:
