@@ -74,6 +74,8 @@ class App:
         with open(get_file_path("pca_descriptions.txt"), "r") as file:
             self.slider_descriptions = file.read().splitlines()
 
+        self.move_sliders = False
+        self.update_sliders = False
         self.slider_move_speed = 0.2
         self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
 
@@ -141,8 +143,8 @@ class App:
         self.text_reset_slider = self.font.render("0 - Reset sliders", True, (255,255,255))
         self.text_save_skin = self.font.render("S - Save skin", True, (255,255,255))
         self.text_load_skin = self.font.render("L - Load skin", True, (255,255,255))
-        self.text_move_sliders = self.font.render("M & hold - Move sliders", True, (255,255,255))
         self.text_converge = self.font.render("H - Converge", True, (255,255,255))
+        self.text_move_sliders = self.font.render("M - Move sliders", True, (255,255,255) if self.move_sliders else (100,100,100))
         self.text_toggle_overlay = self.font.render("O - Toggle overlay", True, (255,255,255) if self.overlay else (100,100,100))
         self.text_sharpen = self.font.render("X - Sharpen", True, (255,255,255) if self.sharpen_skin else (100,100,100))
         self.text_sharpen_value = self.font.render("Sharpen value: " + str(self.sharpen_value), True, (255,255,255) if self.sharpen_skin else (100,100,100))
@@ -238,9 +240,15 @@ class App:
                     return
                 
                 new_inputs = self.model_encode.run(None, {"input": img.reshape(1,4,64,64)})[0]
-                self.input_values = new_inputs
-                self.update_sliders_from_inputs()
-                self.run_model()
+                if self.move_sliders:
+                    raw_slider_values = np.dot(new_inputs[0] - self.pca_mean, self.pca_components.T)
+                    self.slider_move_target = (1-(raw_slider_values/(self.pca_std * self.slider_range_factor)))/2
+                    self.slider_move_target = np.clip(self.slider_move_target, 0, 1)
+                    self.update_sliders = True
+                else:
+                    self.input_values = new_inputs
+                    self.update_sliders_from_inputs()
+                    self.run_model()
             except:
                 print("Error: couldn't load skin")
 
@@ -262,13 +270,21 @@ class App:
         self.slider_values = np.clip(self.slider_values, 0, 1)
 
     def randomize_slider_values(self):
-        self.slider_values = (1-(np.random.normal(0, self.pca_std, 256)/(self.pca_std * self.slider_range_factor)))/2
-        self.slider_values = np.clip(self.slider_values, 0, 1)
-        self.update_inputs_from_sliders()
+        if self.move_sliders:
+            self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
+            self.update_sliders = True
+        else:
+            self.slider_values = (1-(np.random.normal(0, self.pca_std, 256)/(self.pca_std * self.slider_range_factor)))/2
+            self.slider_values = np.clip(self.slider_values, 0, 1)
+            self.update_inputs_from_sliders()
 
     def reset_slider_values(self):
-        self.slider_values = np.full((256), 0.5, dtype=np.float32)
-        self.update_inputs_from_sliders()
+        if self.move_sliders:
+            self.slider_move_target = np.full((256), 0.5, dtype=np.float32)
+            self.update_sliders = True
+        else:
+            self.slider_values = np.full((256), 0.5, dtype=np.float32)
+            self.update_inputs_from_sliders()
 
     def update(self):
 
@@ -278,12 +294,16 @@ class App:
             self.update_sliders_from_inputs()
             self.update_inputs_from_sliders()
             self.run_model()
+            self.update_sliders = False
             
-        # move to random
-        if self.keys_pressed[pygame.K_m]:
+        # move sliders
+        if self.move_sliders and self.update_sliders:
             self.slider_values += (self.slider_move_target - self.slider_values) * self.slider_move_speed
             self.update_inputs_from_sliders()
             self.run_model()
+
+            if np.sum(np.abs(self.slider_values - self.slider_move_target)) < 0.1:
+                self.update_sliders = False
             
 
     def run(self):
@@ -296,9 +316,6 @@ class App:
             for event in event_list:
                 if event.type == pygame.QUIT:
                     self.running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_m:
-                        self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
                 elif event.type == pygame.KEYUP:
                     if event.key == pygame.K_r:
                         self.randomize_slider_values()
@@ -310,6 +327,9 @@ class App:
                         self.save_skin()
                     elif event.key == pygame.K_l:
                         self.load_skin()
+                    elif event.key == pygame.K_m:
+                        self.move_sliders = not self.move_sliders
+                        self.text_move_sliders = self.font.render("M - Move sliders", True, (255,255,255) if self.move_sliders else (100,100,100))
                     elif event.key == pygame.K_o:
                         self.overlay = not self.overlay
                         self.text_toggle_overlay = self.font.render("O - Toggle overlay", True, (255,255,255) if self.overlay else (100,100,100))
@@ -435,8 +455,8 @@ class App:
                 self.window.blit(self.text_randomize_slider, (self.width-200, 40))
                 self.window.blit(self.text_save_skin, (self.width-200, 60))
                 self.window.blit(self.text_load_skin, (self.width-200, 80))
-                self.window.blit(self.text_move_sliders, (self.width-200, 100))
-                self.window.blit(self.text_converge, (self.width-200, 120))
+                self.window.blit(self.text_converge, (self.width-200, 100))
+                self.window.blit(self.text_move_sliders, (self.width-200, 120))
                 self.window.blit(self.text_toggle_overlay, (self.width-200, 140))
                 self.window.blit(self.text_sharpen, (self.width-200, self.sharpen_slider_y-22))
                 self.window.blit(self.text_sharpen_value, (self.width-200, self.sharpen_slider_y+20))
