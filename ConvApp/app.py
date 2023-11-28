@@ -131,7 +131,7 @@ class App:
         self.slider_range_width = 170
         self.slider_range_height = 18
         self.slider_range_knob_width = 8
-        self.slider_range_max = 10
+        self.slider_range_max = 6
         self.slider_range_min = 0.1
         self.slider_range_default = 3
         self.slider_range_factor = self.slider_range_default
