@@ -2,13 +2,10 @@ import os
 import onnxruntime as ort
 from PIL import Image
 import random
-from time import sleep
-import asyncio
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 import numpy as np
 import sys
 import pygame
-from keyboard import is_pressed as key_is_pressed
 from scipy.signal import convolve2d
 
 
@@ -42,6 +39,7 @@ class App:
         pygame.display.set_caption("MSG - Minecraft Skin Generator by BirnB4um")
         # pygame.display.set_icon(pygame.image.load(get_file_path("icon.png")))
         self.clock = pygame.time.Clock()
+        self.keys_pressed = None
 
         self.font = pygame.font.SysFont("Arial", 18)
         self.font_small = pygame.font.SysFont("Arial", 10)
@@ -76,6 +74,9 @@ class App:
         with open(get_file_path("pca_descriptions.txt"), "r") as file:
             self.slider_descriptions = file.read().splitlines()
 
+        self.slider_move_speed = 0.2
+        self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
+
         self.input_values = np.zeros((1,512), dtype=np.float32)
         self.slider_values = np.full((256), 0.5, dtype=np.float32)
         self.slider_offset = 0
@@ -103,7 +104,7 @@ class App:
         self.sharpen_skin = False
         self.mouse_pressed_sharpen_slider = False
         self.sharpen_slider_x = self.width-200
-        self.sharpen_slider_y = 153
+        self.sharpen_slider_y = 193
         self.sharpen_slider_width = 170
         self.sharpen_slider_height = 18
         self.sharpen_slider_knob_width = 8
@@ -115,7 +116,7 @@ class App:
         self.reduce_colors = False
         self.mouse_pressed_colors_slider = False
         self.number_colors_slider_x = self.width-200
-        self.number_colors_slider_y = 224
+        self.number_colors_slider_y = 264
         self.number_colors_slider_width = 170
         self.number_colors_slider_height = 18
         self.number_colors_slider_knob_width = 8
@@ -126,7 +127,7 @@ class App:
 
         self.mouse_pressed_range_slider = False
         self.slider_range_x = self.width-200
-        self.slider_range_y = 300
+        self.slider_range_y = 340
         self.slider_range_width = 170
         self.slider_range_height = 18
         self.slider_range_knob_width = 8
@@ -140,6 +141,8 @@ class App:
         self.text_reset_slider = self.font.render("0 - Reset sliders", True, (255,255,255))
         self.text_save_skin = self.font.render("S - Save skin", True, (255,255,255))
         self.text_load_skin = self.font.render("L - Load skin", True, (255,255,255))
+        self.text_move_sliders = self.font.render("M & hold - Move sliders", True, (255,255,255))
+        self.text_converge = self.font.render("H - Converge", True, (255,255,255))
         self.text_toggle_overlay = self.font.render("O - Toggle overlay", True, (255,255,255) if self.overlay else (100,100,100))
         self.text_sharpen = self.font.render("X - Sharpen", True, (255,255,255) if self.sharpen_skin else (100,100,100))
         self.text_sharpen_value = self.font.render("Sharpen value: " + str(self.sharpen_value), True, (255,255,255) if self.sharpen_skin else (100,100,100))
@@ -270,9 +273,15 @@ class App:
     def update(self):
 
         # feed output-skin back through model
-        if key_is_pressed("h"):
+        if self.keys_pressed[pygame.K_h]:
             self.input_values = self.model_encode.run(None, {"input": [(self.skin_array.transpose(2,0,1)/255).astype(np.float32)]})[0]
             self.update_sliders_from_inputs()
+            self.update_inputs_from_sliders()
+            self.run_model()
+            
+        # move to random
+        if self.keys_pressed[pygame.K_m]:
+            self.slider_values += (self.slider_move_target - self.slider_values) * self.slider_move_speed
             self.update_inputs_from_sliders()
             self.run_model()
             
@@ -282,10 +291,14 @@ class App:
             self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
 
             # Handle events
+            self.keys_pressed = pygame.key.get_pressed()
             event_list = pygame.event.get()
             for event in event_list:
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_m:
+                        self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
                 elif event.type == pygame.KEYUP:
                     if event.key == pygame.K_r:
                         self.randomize_slider_values()
@@ -418,11 +431,13 @@ class App:
                     self.window.blit(self.slider_numbers[slider_i], (slider_x, self.slider_y + self.slider_height + 5))
 
                 # draw texts
-                self.window.blit(self.text_randomize_slider, (self.width-200, 20))
-                self.window.blit(self.text_reset_slider, (self.width-200, 40))
+                self.window.blit(self.text_reset_slider, (self.width-200, 20))
+                self.window.blit(self.text_randomize_slider, (self.width-200, 40))
                 self.window.blit(self.text_save_skin, (self.width-200, 60))
                 self.window.blit(self.text_load_skin, (self.width-200, 80))
-                self.window.blit(self.text_toggle_overlay, (self.width-200, 100))
+                self.window.blit(self.text_move_sliders, (self.width-200, 100))
+                self.window.blit(self.text_converge, (self.width-200, 120))
+                self.window.blit(self.text_toggle_overlay, (self.width-200, 140))
                 self.window.blit(self.text_sharpen, (self.width-200, self.sharpen_slider_y-22))
                 self.window.blit(self.text_sharpen_value, (self.width-200, self.sharpen_slider_y+20))
                 self.window.blit(self.text_reduce_colors, (self.width-200, self.number_colors_slider_y-22))
