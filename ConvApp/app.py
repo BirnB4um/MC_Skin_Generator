@@ -338,6 +338,8 @@ class App:
                         self.load_skin()
                     elif event.key == pygame.K_m:
                         self.move_sliders = not self.move_sliders
+                        if not self.move_sliders:
+                            self.update_sliders = False
                         self.text_move_sliders = self.font.render("M - Move sliders", True, (255,255,255) if self.move_sliders else (100,100,100))
                     elif event.key == pygame.K_o:
                         self.overlay = not self.overlay
@@ -360,9 +362,12 @@ class App:
 
                         # mouse over pca sliders
                         if self.mouse_pressed_slider_i != None:
-                            self.slider_values[self.mouse_pressed_slider_i] = np.clip((self.mouse_y - self.slider_y - self.slider_knob_height/2) / (self.slider_height-self.slider_knob_height), 0, 1)
-                            self.update_inputs_from_sliders()
-                            self.run_model()
+                            if self.update_sliders:
+                                self.mouse_pressed_slider_i = None
+                            else:
+                                self.slider_values[self.mouse_pressed_slider_i] = np.clip((self.mouse_y - self.slider_y - self.slider_knob_height/2) / (self.slider_height-self.slider_knob_height), 0, 1)
+                                self.update_inputs_from_sliders()
+                                self.run_model()
 
                         # mouse over sharpen slider
                         if point_vs_rect(self.mouse_x, self.mouse_y, self.sharpen_slider_x, self.sharpen_slider_y, self.sharpen_slider_width, self.sharpen_slider_height):
@@ -396,11 +401,14 @@ class App:
 
                 elif event.type == pygame.MOUSEMOTION:
                     if point_vs_rect(self.mouse_x, self.mouse_y, self.slider_x-self.slider_spacing/2, self.slider_y, (self.slider_width+self.slider_spacing)*self.number_of_sliders_shown, self.slider_height):
-                        before_i = self.mouse_over_slider_i
-                        self.mouse_over_slider_i = self.slider_offset + int((self.mouse_x - self.slider_x + self.slider_spacing/2) / (self.slider_width + self.slider_spacing))
-                        if self.mouse_over_slider_i != before_i:
-                            i = self.mouse_over_slider_i if self.mouse_pressed_slider_i == None else self.mouse_pressed_slider_i
-                            self.text_slider_description = self.font.render(f"{i+1}: "+self.slider_descriptions[i], True, (255,255,255))
+                        if self.update_sliders:
+                            self.mouse_pressed_slider_i = None
+                        else:
+                            before_i = self.mouse_over_slider_i
+                            self.mouse_over_slider_i = self.slider_offset + int((self.mouse_x - self.slider_x + self.slider_spacing/2) / (self.slider_width + self.slider_spacing))
+                            if self.mouse_over_slider_i != before_i:
+                                i = self.mouse_over_slider_i if self.mouse_pressed_slider_i == None else self.mouse_pressed_slider_i
+                                self.text_slider_description = self.font.render(f"{i+1}: "+self.slider_descriptions[i], True, (255,255,255))
                     else:
                         self.mouse_over_slider_i = None
 
