@@ -24,7 +24,6 @@ def point_vs_rect(px,py,rx,ry,rw,rh):
     return px > rx and px <= rx+rw and py > ry and py < ry+rh
 
 
-
 class App:
 
     def __init__(self):
@@ -76,8 +75,9 @@ class App:
 
         self.move_sliders = False
         self.update_sliders = False
-        self.slider_move_speed = 0.2
+        self.slider_move_frames = 20
         self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
+        self.slider_move_speed = (self.slider_move_target) / self.slider_move_frames
 
         self.input_values = np.zeros((1,512), dtype=np.float32)
         self.slider_values = np.full((256), 0.5, dtype=np.float32)
@@ -244,6 +244,7 @@ class App:
                     raw_slider_values = np.dot(new_inputs[0] - self.pca_mean, self.pca_components.T)
                     self.slider_move_target = (1-(raw_slider_values/(self.pca_std * self.slider_range_factor)))/2
                     self.slider_move_target = np.clip(self.slider_move_target, 0, 1)
+                    self.slider_move_speed = (self.slider_move_target - self.slider_values) / self.slider_move_frames
                     self.update_sliders = True
                 else:
                     self.input_values = new_inputs
@@ -272,6 +273,7 @@ class App:
     def randomize_slider_values(self):
         if self.move_sliders:
             self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
+            self.slider_move_speed = (self.slider_move_target - self.slider_values) / self.slider_move_frames
             self.update_sliders = True
         else:
             self.slider_values = (1-(np.random.normal(0, self.pca_std, 256)/(self.pca_std * self.slider_range_factor)))/2
@@ -281,6 +283,7 @@ class App:
     def reset_slider_values(self):
         if self.move_sliders:
             self.slider_move_target = np.full((256), 0.5, dtype=np.float32)
+            self.slider_move_speed = (self.slider_move_target - self.slider_values) / self.slider_move_frames
             self.update_sliders = True
         else:
             self.slider_values = np.full((256), 0.5, dtype=np.float32)
@@ -298,12 +301,18 @@ class App:
             
         # move sliders
         if self.move_sliders and self.update_sliders:
-            self.slider_values += (self.slider_move_target - self.slider_values) * self.slider_move_speed
+            #move sliders with constant speed
+            self.slider_values += np.where(self.slider_values != self.slider_move_target, self.slider_move_speed, 0)
+            self.slider_values = np.where(abs(self.slider_values - self.slider_move_target) <= self.slider_move_speed, self.slider_move_target, self.slider_values)
+            
+            if np.sum(np.abs(self.slider_values - self.slider_move_target)) < 0.1:
+                self.slider_values = self.slider_move_target
+                self.update_sliders = False
+                
+            # self.slider_values += (self.slider_move_target - self.slider_values) * self.slider_move_speed
             self.update_inputs_from_sliders()
             self.run_model()
 
-            if np.sum(np.abs(self.slider_values - self.slider_move_target)) < 0.1:
-                self.update_sliders = False
             
 
     def run(self):
