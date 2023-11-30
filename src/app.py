@@ -11,10 +11,8 @@ from scipy.signal import convolve2d
 
 def get_file_path(file_name):
     if hasattr(sys, '_MEIPASS'):
-        # Running as executable
         base_path = sys._MEIPASS
     else:
-        # Running as script
         base_path = os.path.dirname(os.path.abspath(__file__))
 
     file_path = os.path.join(base_path, file_name)
@@ -22,7 +20,6 @@ def get_file_path(file_name):
 
 def point_vs_rect(px,py,rx,ry,rw,rh):
     return px > rx and px <= rx+rw and py > ry and py < ry+rh
-
 
 class App:
 
@@ -35,7 +32,7 @@ class App:
         self.background_color = [18,18,20]
         self.running = True
         self.window = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("MSG - Minecraft Skin Generator by BirnB4um")
+        pygame.display.set_caption("Minecraft Skin Generator")
         # pygame.display.set_icon(pygame.image.load(get_file_path("icon.png")))
         self.clock = pygame.time.Clock()
         self.keys_pressed = None
@@ -75,7 +72,7 @@ class App:
 
         self.move_sliders = False
         self.update_sliders = False
-        self.slider_move_frames = 20
+        self.slider_move_frames = 10
         self.slider_move_target = np.clip((np.random.normal(0, 1, (256))/6) + 0.5, 0, 1)
         self.slider_move_speed = (self.slider_move_target) / self.slider_move_frames
 
