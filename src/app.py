@@ -33,7 +33,7 @@ class App:
         self.running = True
         self.window = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Minecraft Skin Generator")
-        # pygame.display.set_icon(pygame.image.load(get_file_path("icon.png")))
+        pygame.display.set_icon(pygame.image.load(get_file_path("icon.png")))
         self.clock = pygame.time.Clock()
         self.keys_pressed = None
 
