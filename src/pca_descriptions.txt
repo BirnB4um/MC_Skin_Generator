@@ -1,22 +1,31 @@
 ?
-brightness
+brightness (including overlay)
 brightness
 head overlay
 face type, shoe color
+inverse hair/upper-body brightness
 hair color
-?
 temperature
+hand & shoe color
+inverse head/legs color
+green/red body color
+skin color, hair color
+shoe color
+red/green body color
 ?
-inverse head/legs brightness
+inverse leg/shoe color
 ?
 ?
 ?
+lower arm color
 ?
 ?
 ?
 ?
+shoe color, back head overlay density
 ?
 ?
+jacket opening
 ?
 ?
 ?
@@ -29,7 +38,9 @@ inverse head/legs brightness
 ?
 ?
 ?
+jacket opening
 ?
+hairline
 ?
 ?
 ?
@@ -63,18 +74,7 @@ inverse head/legs brightness
 ?
 ?
 ?
-?
-?
-?
-?
-?
-?
-?
-?
-?
-?
-?
-?
+Tie / Jacket opening
 ?
 ?
 ?
