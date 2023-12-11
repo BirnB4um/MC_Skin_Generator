@@ -1,6 +1,6 @@
 # Minecraft Skin Generator (Old version)
 
-This is the older version of MSG. You can find the newest version [here](https://www.youtube.com).
+This is the older version of MSG. You can find the newest version [here](../).
 
 Generate new Minecraft Skins with an Autoencoder.  
 Run app.py or standalone dist/MSG_old.exe to start the application.  
