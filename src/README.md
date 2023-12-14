@@ -22,7 +22,7 @@ The sliders represent individual features of a skin. Scroll the mousewheel over 
 The "Slider range" slider controls the intensity of the sliders.
 
 # Examples 
-<img src="../ReadMe/mov1.gif" width="500" height="250">  
+<img src="../ReadMe/skin_animation.gif" width="320" height="211">  
 
 
 
