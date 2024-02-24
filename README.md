@@ -1,7 +1,7 @@
 # Minecraft Skin Generator
 
 Generate new Minecraft skins with a Convolutional Autoencoder.  
-You can find executables in the folder *dist/* for both the old and the new version.  
+You can find executables in the releases: https://github.com/BirnB4um/MC_Skin_Generator/releases
 
 Find more information [here](src/) and for the old version [here](src/old_app/)
 
