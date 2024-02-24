@@ -3,7 +3,8 @@
 This is the older version of MSG. You can find the newest version [here](../).
 
 Generate new Minecraft Skins with an Autoencoder.  
-Run app.py or standalone dist/MSG_old.exe to start the application.  
+Run app.py or standalone MSG_old.exe to start the application.  
+You can find the executable MSG_old.exe [here](https://github.com/BirnB4um/MC_Skin_Generator/releases/tag/v1.0).  
 The model only produces classic skins without overlays.
 
 - The 128 sliders represent the latent space of the AE
