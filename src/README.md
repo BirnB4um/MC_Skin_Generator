@@ -1,4 +1,4 @@
-# Minecraft Skin Generator
+# Minecraft Skin Generator 2.0
 
 This is the newest version of MSG.
 
