@@ -1,4 +1,4 @@
-# Minecraft Skin Generator (Old version)
+# Minecraft Skin Generator 1.0 (Old version)
 
 This is the older version of MSG. You can find the newest version [here](../).
 
