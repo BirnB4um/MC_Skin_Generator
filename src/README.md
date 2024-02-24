@@ -3,7 +3,8 @@
 This is the newest version of MSG.
 
 Generate new Minecraft Skins with a Convolutional Autoencoder.  
-Run app.py or standalone dist/MSG.exe to start the application.
+Run app.py or standalone MSG.exe to start the application.
+You can find the latest MSG.exe [here](https://github.com/BirnB4um/MC_Skin_Generator/releases/tag/v2.0)
 
 The sliders represent individual features of a skin. Scroll the mousewheel over the sliders to access more less-influential sliders (256 sliders total). Hover over a slider to display its description.
 
